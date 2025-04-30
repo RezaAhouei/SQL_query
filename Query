@@ -1,0 +1,13 @@
+SELECT 
+    (SUM(CASE
+             WHEN accepted_at IS NOT NULL THEN 1
+             ELSE 0
+         END) / 
+     SUM(CASE
+             WHEN launched_at IS NOT NULL THEN 1
+             ELSE 0
+         END)) * 100 AS `Accepted Ratio`
+FROM orders
+WHERE deleted_at IS NULL
+  AND created_at BETWEEN '2023-03-21' AND '2023-04-20'
+    AND customer_id not in (15809086,15886636);
