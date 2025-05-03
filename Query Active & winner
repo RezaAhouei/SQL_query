@@ -1,0 +1,306 @@
+اکتیو کوریر میلادی
+  COUNT(DISTINCT active_courier) AS `Active Courier`,
+  COUNT(DISTINCT active_customer) AS `Active Customer`
+FROM
+  (SELECT courier_id AS `active_courier`,
+          customer_id AS `active_customer`,
+          city AS `city`,
+          transport_type AS `transport_type`,
+          launched_at AS `launched_at`
+   FROM orders
+   WHERE deleted_at IS NULL
+     AND status IN ('finished', 'delivered') 
+     AND launched_at between '2024-03-20' and '2024-04-19'
+     --AND transport_type IN ('motorbike')
+     AND customer_id NOT IN (15886636, 15809086)
+   ORDER BY launched_at ASC) AS virtual_table
+GROUP BY DATE_FORMAT(launched_at, '%Y-%m')
+ORDER BY `Month` ASC;
+--------------------------------------------------------------------------------------------------------------------
+
+
+
+
+اکتیو کوریر 
+SELECT 
+    DATE_FORMAT(launched_at, '%Y-%m') AS month,  -- تبدیل تاریخ به فرمت ماهانه
+    transport_type AS service_transportation,    -- نوع حمل‌ونقل
+    COUNT(DISTINCT courier_id) AS courier_count, -- تعداد پیک فعال
+    ROUND((COUNT(DISTINCT courier_id) / 
+           (SELECT COUNT(DISTINCT courier_id)
+            FROM orders
+            WHERE status IN ('finished', 'delivered')
+              AND deleted_at IS NULL
+              AND launched_at BETWEEN '2024-01-01' AND '2024-12-31')) * 100, 2) AS `Percentage` -- درصد مشارکت
+FROM 
+    orders
+WHERE 
+    status IN ('finished', 'delivered')          -- وضعیت سفارش
+    AND deleted_at IS NULL                       -- سفارش حذف نشده باشد
+    AND launched_at BETWEEN '2024-01-01' AND '2024-12-31' -- بازه تاریخی قابل تغییر
+GROUP BY 
+    month, 
+    transport_type                               -- گروه‌بندی براساس ماه و نوع حمل‌ونقل
+ORDER BY 
+    month ASC, 
+    service_transportation ASC
+LIMIT 1000;
+-------------------------------------------------------------------------------------------------
+
+
+
+اکتیو کوریر براساس سرویس
+SELECT 
+    transport_type AS service_transportation,        
+    COUNT(DISTINCT courier_id) AS total_courier_count 
+FROM 
+    orders
+WHERE 
+    status IN ('finished', 'delivered')             
+    AND deleted_at IS NULL                          
+    AND launched_at BETWEEN '2024-03-20' AND '2024-12-20' 
+GROUP BY 
+    transport_type                                  
+ORDER BY 
+    total_courier_count DESC;                       
+----------------------------------------------------------------------------------------------------
+
+
+ایدی درخواست ها به همراه مبلغ 
+SELECT id,
+       launched_at,
+       price
+FROM alopeyk.orders  
+WHERE status IN ('finished', 'delivered')
+  AND city = 'mashhad'
+  AND DATE(created_at) >= CURRENT_DATE - INTERVAL 5 DAY;
+-----------------------------------------------------------------------------------------------------------------
+
+
+رکوئست ها براساس مبلغ و شهر
+SELECT 
+    o.id AS request_id, 
+    o.price, 
+    o.launched_at AS request_date, 
+    o.city,
+    o.status 
+FROM alopeyk.orders o
+LEFT JOIN etl.unique_orders uo ON uo.order_id = o.id
+WHERE o.city = 'shiraz'
+and date(request_date) >= curdate() - interval 7 day;
+-----------------------------------------------------------------------------------------------------------------------
+
+ویزیتور پرفورمنس
+SELECT 
+    `Visitor Name`,
+    `Visitor ID`,
+    `Courier ID`,
+    `Courier Name`,
+    `Courier Verification date`,
+    `Courier Verification date - Shamsi`,
+    `Courier Registration date`,
+    `Courier Registration date - shamsi`,
+    transport_types,
+    city,
+    IFNULL(`Filled`, 0) AS `Filled`,
+    `First Order Date`
+FROM
+(
+    SELECT 
+        CONCAT(u.firstname, ' ', u.lastname) AS `Visitor Name`,
+        va.performer_id AS `Visitor ID`,
+        va.item_id AS `Courier ID`,
+        CONCAT(uc.firstname, ' ', uc.lastname) AS `Courier Name`,
+        c.verified_at AS `Courier Verification date`,
+        p.pdate AS `Courier Verification date - Shamsi`,
+        c.created_at AS `Courier Registration date`,
+        p2.pdate AS `Courier Registration date - shamsi`,
+        c.transport_types,
+        uc.city,
+        COUNT(o.id) AS `Filled`,
+        MIN(o.created_at) AS `First Order Date`
+
+    FROM vteam_activities va
+    LEFT JOIN users u ON va.performer_id = u.id
+    LEFT JOIN visitors v ON v.user_id = va.performer_id
+    LEFT JOIN couriers c ON c.user_id = va.item_id
+    LEFT JOIN users uc ON va.item_id = uc.id
+    LEFT JOIN pdates p ON DATE(c.verified_at) = p.date
+    LEFT JOIN pdates p2 ON DATE(c.created_at) = p2.date
+    LEFT JOIN alopeyk.orders o ON o.courier_id = va.item_id 
+        AND o.status IN ('finished', 'delivered')
+        AND o.deleted_at IS NULL
+
+    WHERE va.deleted_at IS NULL
+    AND c.verified_at IS NOT NULL
+    --AND va.created_at > '2025-02-01 00:00:00'
+    
+    GROUP BY va.item_id
+) AS virtual_table
+LIMIT 10000;
+-------------------------------------------------------------------------------------------------------------------------
+
+
+کوئری   سفیان وری فای شده با تاریخ و وری فای رحیستر و تاریخ اولین سفارش
+SELECT 
+    `Courier ID`,
+    `Courier Registration date - shamsi`,
+    `Courier Verification date - Shamsi`,
+    `Visitor Name`,
+    transport_types,
+    city,
+    IFNULL(`First Order Date`, 'سفارش ندارد') AS `First Order Date`
+FROM
+(
+    SELECT 
+        va.item_id AS `Courier ID`,
+        p2.pdate AS `Courier Registration date - shamsi`,
+        p.pdate AS `Courier Verification date - Shamsi`,
+        CONCAT(u.firstname, ' ', u.lastname) AS `Visitor Name`,
+        c.transport_types,
+        uc.city,
+        MIN(o.created_at) AS `First Order Date`
+
+    FROM vteam_activities va
+    LEFT JOIN users u ON va.performer_id = u.id
+    LEFT JOIN visitors v ON v.user_id = va.performer_id
+    LEFT JOIN couriers c ON c.user_id = va.item_id
+    LEFT JOIN users uc ON va.item_id = uc.id
+    LEFT JOIN pdates p ON DATE(c.verified_at) = p.date
+    LEFT JOIN pdates p2 ON DATE(c.created_at) = p2.date
+    LEFT JOIN alopeyk.orders o ON o.courier_id = va.item_id 
+        AND o.status IN ('finished', 'delivered')
+        AND o.deleted_at IS NULL
+
+    WHERE va.deleted_at IS NULL
+    AND c.verified_at IS NOT NULL
+    and `Courier Verification date - Shamsi` between '1403-08-01' and '1403-11-28'
+    --AND va.created_at > '2025-02-01 00:00:00'
+    
+    GROUP BY va.item_id
+) AS virtual_table
+LIMIT 10000;
+-----------------------------------------------------------------------------------------------------------------------------------------------
+اکتیو کوریر ماهانه به تفکیک شهر
+SELECT 
+    COUNT(DISTINCT courier_id) AS `Total Active Couriers`
+FROM orders
+WHERE deleted_at IS NULL
+    AND status IN ('finished', 'delivered')
+    AND launched_at BETWEEN '2024-11-21' AND '2024-12-20' 
+    AND city in ('tehran')
+------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+تپسی شاپ
+SELECT 
+    id, 
+    customer_id, 
+    distance,
+    price,
+    DATE(launched_at) AS Date
+FROM orders 
+WHERE deleted_at IS NULL
+    AND status IN ('finished', 'delivered')
+    AND launched_at BETWEEN '2024-03-20' AND '2025-04-13' 
+    AND customer_id != '15809086';
+ ```
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+
+MAU اکتیو ماهانه
+SELECT DISTINCT courier_id
+FROM orders
+WHERE deleted_at IS NULL
+    AND status IN ('finished', 'delivered')
+    AND launched_at BETWEEN '2024-12-21 00:00:00' AND '2025-01-19 23:59:59' 
+    --AND city IN ('tehran')
+-------------------------------------------------------------------------------------------------------------------------------------------
+
+
+avg price weeklly
+
+SELECT 
+    CONCAT(
+        DATE_FORMAT(week_start_date, '%Y-%m-%d'),
+        ' تا ',
+        DATE_FORMAT(DATE_ADD(week_start_date, INTERVAL 6 DAY), '%Y-%m-%d')
+    ) AS week_range,
+    AVG(price) AS `Average Order Value - IRT`,
+    AVG(c_ratio) AS `Commission Ratio %`
+FROM (
+    SELECT 
+        o.price,
+        o.launched_at,
+        ABS(t.amount) / NULLIF(o.price, 0) AS c_ratio,
+        DATE_ADD('2025-03-21', INTERVAL FLOOR(DATEDIFF(o.launched_at, '2025-03-21') / 7) WEEK) AS week_start_date
+    FROM orders o
+    LEFT JOIN alopeyk.transactions t 
+        ON o.id = t.order_id
+        AND t.subject = 'commission'
+        AND t.deleted_at IS NULL
+    WHERE 
+        o.deleted_at IS NULL
+        AND o.status IN ('delivered', 'finished')
+        AND o.launched_at BETWEEN '2025-03-21' AND '2025-04-20'
+        AND o.transport_type IN ('motor_taxi')
+) AS virtual_table
+GROUP BY week_start_date
+ORDER BY week_start_date;
+-----------------------------------------------------------------------------------------------------------------------------
+
+میانگین مبلغ درخواست ها هر سوریس جداگانه
+SELECT AVG(price) AS `AVG(price)`
+FROM orders
+WHERE deleted_at IS NULL
+  AND status IN ('delivered', 'finished')
+  --AND customer_id in ('15809086') --zap
+  --AND customer_id in ('15886636') -- tapsi
+ --AND customer_id not in ('15809086', '15886636') and transport_type = 'motor_taxi' --motor-taxi
+ --AND customer_id not in ('15809086', '15886636') and transport_type in ('cargo', 'cargo_s') --alovanet
+  AND customer_id not in ('15809086', '15886636') and transport_type = 'motorbike' --alopeyk
+  AND DATE(created_at) BETWEEN '2025-03-01' AND '2025-03-07';
+------------------------------------------------------------------------------------------------------------------------------------------
+
+برندگان کمپین ها
+
+SELECT 
+    courier_id AS 'Courier ID',
+    (
+    SELECT
+        max(transport_types)
+    FROM
+        alopeyk.couriers c
+    WHERE
+        c.user_id = o.courier_id) AS 'Transport Type',
+    COUNT(o.id) as 'Count of Filled',
+    COALESCE(SUM(CASE WHEN o.customer_id = 15809086 THEN 1 END), 0) AS 'zap',
+    COALESCE(SUM(CASE WHEN o.customer_id = 15886636 THEN 1 END), 0) AS 'Tap30-Shop',
+    COALESCE(SUM(CASE WHEN o.customer_id NOT IN (15886636, 15809086) THEN 1 END), 0) AS 'Alopeyk - total',
+    COALESCE(SUM(CASE WHEN (o.customer_id NOT IN (15886636, 15809086) and transport_type = "motorbike") THEN 1 END), 0) AS 'alopeyk - motorbike',
+    COALESCE(SUM(CASE WHEN (o.customer_id NOT IN (15886636, 15809086) and transport_type = "motor_taxi") THEN 1 END), 0) AS 'alopeyk - Taxi Motor',
+    COALESCE(SUM(CASE WHEN (o.customer_id NOT IN (15809086) and transport_type = "motorbike") THEN 1 END), 0) AS 'dartil&alopeyk - motorbike',
+    COALESCE(SUM(CASE WHEN (o.customer_id NOT IN (15809086)) THEN 1 END), 0) AS 'dartil&alopeyk - total',
+    COALESCE(SUM(CASE WHEN (o.customer_id NOT IN (15886636) and transport_type = "motorbike") THEN 1 END), 0) AS 'zap&alopeyk - motorbike',
+    COALESCE(SUM(CASE WHEN (o.customer_id NOT IN (15886636)) THEN 1 END), 0) AS 'zap&alopeyk - total',
+    COALESCE(SUM(CASE WHEN (o.customer_id IN (15886636, 15809086)) THEN 1 END), 0) AS 'zap&dartil',
+    COALESCE(SUM(CASE WHEN (o.customer_id NOT IN (15886636, 15809086) and transport_type = "motorbike" and distance <= 5000 ) THEN 1 END), 0) AS 'alopeyk -under 5 KM',
+    SUM(o.price) as 'Turnover - IRT',
+    Max(o.id) as 'Order ID'
+FROM
+    alopeyk.orders o
+WHERE 
+    --date(o.launched_at) = '2025-02-05'
+         date(o.launched_at) BETWEEN "2025-02-0516:00:00" and "2025-02-0523:59:59"
+    AND o.deleted_at IS NULL
+    AND o.status IN ('delivered', 'finished')
+GROUP BY
+    1  
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+
+
