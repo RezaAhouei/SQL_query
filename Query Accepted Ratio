@@ -1,0 +1,155 @@
+کوئری اسکپت رشیو
+SELECT
+(SUM(CASE
+WHEN accepted_at IS NOT NULL THEN 1
+ELSE 0
+END) /
+SUM(CASE
+WHEN launched_at IS NOT NULL THEN 1
+ELSE 0
+END)) * 100 AS Accepted Ratio
+FROM orders
+WHERE deleted_at IS NULL
+AND created_at BETWEEN '2023-03-21' AND '2023-04-20'
+AND customer_id not in (15809086,15886636);
+
+
+
+کوئری اکسپت
+SELECT
+COUNT(id) AS Total Requests,
+SUM(CASE
+WHEN status IN ('delivered', 'finished') THEN 1
+END) AS Total Filled,
+SUM(CASE
+WHEN status = 'expired' THEN 1
+END) AS Total Expired,
+SUM(CASE
+WHEN status = 'cancelled' THEN 1
+END) AS Total Cancelled,
+SUM(CASE
+WHEN accepted_at IS NOT NULL THEN 1
+END) AS Total Accepted
+FROM orders
+WHERE deleted_at IS NULL
+AND launched_at IS NOT NULL
+AND launched_at BETWEEN '2023-03-21' AND '2023-04-20'
+AND customer_id NOT IN (15886636, 15809086);
+
+
+
+
+
+
+اکسپت تونیک
+SELECT
+DATE(o.launched_at) AS __timestamp,
+o.customer_id,
+COUNT(DISTINCT o.id) AS Unique_Request,
+COUNT(DISTINCT CASE WHEN o.accepted_at IS NOT NULL THEN o.id END) AS Accepted_Unique_Request,
+(COUNT(DISTINCT CASE WHEN o.accepted_at IS NOT NULL THEN o.id END) * 100.0 /
+NULLIF(COUNT(DISTINCT o.id), 0)
+) AS Accepted_Ratio
+FROM alopeyk.orders o
+LEFT JOIN etl.unique_orders uo ON uo.order_id = o.id
+WHERE o.deleted_at IS NULL
+AND o.launched_at BETWEEN '2025-01-25' AND '2025-01-31'
+AND o.customer_id IN (15886636)
+GROUP BY DATE(o.launched_at), o.customer_id
+ORDER BY Unique_Request DESC
+LIMIT 10000;
+
+
+
+
+
+
+
+اکسپت رشیو تونیک
+SELECT
+COUNT(DISTINCT o.id) AS Total_Unique_Request,
+COUNT(DISTINCT CASE WHEN o.accepted_at IS NOT NULL THEN o.id END) AS Total_Accepted_Unique_Request,
+(COUNT(DISTINCT CASE WHEN o.accepted_at IS NOT NULL THEN o.id END) * 100.0 /
+NULLIF(COUNT(DISTINCT o.id), 0)
+) AS Total_Accepted_Ratio
+FROM alopeyk.orders o
+LEFT JOIN etl.unique_orders uo ON uo.order_id = o.id
+WHERE o.deleted_at IS NULL
+AND o.launched_at BETWEEN '2025-02-15' AND '2025-02-21'
+--AND o.customer_id IN (15886636) -- در صورت نیاز فعال کنید
+AND o.transport_type = 'motor_taxi';
+
+
+
+
+
+
+فید یونیک
+SELECT
+CONCAT(
+DATE_FORMAT(DATE_ADD('2024-12-14', INTERVAL FLOOR(DATEDIFF(DATE(o.launched_at), '2024-12-14') / 7) * 7 DAY), '%Y-%m-%d'),
+' to ',
+DATE_FORMAT(DATE_ADD('2024-12-14', INTERVAL FLOOR(DATEDIFF(DATE(o.launched_at), '2024-12-14') / 7) * 7 + 6 DAY), '%Y-%m-%d')
+) AS Week_Range,
+
+COUNT(DISTINCT o.id) AS Total_Unique_Request,
+
+COUNT(DISTINCT CASE WHEN o.accepted_at IS NOT NULL THEN o.id END) AS Total_Accepted_Unique_Request,
+
+COUNT(DISTINCT CASE WHEN o.status IN ('delivered', 'finished') THEN o.id END) AS Total_Filled_Unique_Request,
+
+ROUND(
+COUNT(DISTINCT CASE WHEN o.accepted_at IS NOT NULL THEN o.id END) * 100.0 /
+NULLIF(COUNT(DISTINCT o.id), 0), 2
+) AS Total_Accepted_Ratio,
+
+ROUND(
+COUNT(DISTINCT CASE WHEN o.status IN ('delivered', 'finished') THEN o.id END) * 100.0 /
+NULLIF(COUNT(DISTINCT o.id), 0), 2
+) AS Total_Filled_Ratio_Unique
+
+FROM alopeyk.orders o
+INNER JOIN etl.unique_orders uo ON uo.order_id = o.id
+
+WHERE
+o.deleted_at IS NULL
+AND o.launched_at IS NOT NULL
+AND DATE(o.launched_at) BETWEEN '2024-12-14' AND '2025-04-18'
+--AND o.transport_type in ('cargo','cargo_s')
+AND o.customer_id IN (15886636)
+GROUP BY FLOOR(DATEDIFF(DATE(o.launched_at), '2024-12-14') / 7)
+
+ORDER BY MIN(DATE(o.launched_at));
+
+
+
+
+
+فیلد غیر یونیک
+SELECT
+CONCAT(
+DATE_FORMAT(DATE_ADD('2024-12-14', INTERVAL FLOOR(DATEDIFF(DATE(launched_at), '2024-12-14') / 7) * 7 DAY), '%Y-%m-%d'),
+' to ',
+DATE_FORMAT(DATE_ADD('2024-12-14', INTERVAL FLOOR(DATEDIFF(DATE(launched_at), '2024-12-14') / 7) * 7 + 6 DAY), '%Y-%m-%d')
+) AS Week_Range,
+
+ROUND(SUM(CASE WHEN accepted_at IS NOT NULL THEN 1 ELSE 0 END) * 100.0 / COUNT(id), 2) AS Acceptance Ratio %,
+
+ROUND(SUM(CASE WHEN status IN ('delivered', 'finished') THEN 1 ELSE 0 END) * 100.0 /
+NULLIF(SUM(CASE WHEN accepted_at IS NOT NULL THEN 1 ELSE 0 END), 0), 2) AS Filled/Accept Ratio %,
+
+ROUND(SUM(CASE WHEN status IN ('delivered', 'finished') THEN 1 ELSE 0 END) * 100.0 / COUNT(id), 2) AS Filled/Request Ratio %
+
+FROM orders
+
+WHERE
+deleted_at IS NULL
+AND launched_at IS NOT NULL
+AND DATE(launched_at) BETWEEN '2024-12-14' AND '2025-04-18'
+AND transport_type in ('cargo','cargo_s')
+--AND customer_id NOT IN (15886636.0, 15809086)
+
+GROUP BY FLOOR(DATEDIFF(DATE(launched_at), '2024-12-14') / 7)
+
+ORDER BY MIN(DATE(launched_at));
+
