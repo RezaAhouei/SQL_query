@@ -298,7 +298,49 @@ GROUP BY
     1  
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+ برودکست ماهانه درخواست ها
+WITH BaseData AS (
+    SELECT
+        pb.order_id,
+        COUNT(DISTINCT pb.courier_id) AS broadcast_per_order,
+        p.pyear,
+        p.pmonth
+    FROM 
+        alopeyk_staging..Broadcast_sent pb WITH (NOLOCK)
+    INNER JOIN alopeyk..orders o WITH (NOLOCK) ON pb.order_id = o.id
+    LEFT JOIN alopeyk..pdates p ON CAST(pb.created_at AS DATE) = p.date
+    WHERE 
+        o.accepted_at IS NOT NULL
+        AND pb.created_at BETWEEN '2025-04-01' AND '2025-05-02'
+        AND o.customer_id in ('15886636')  
+    GROUP BY 
+        pb.order_id, p.pyear, p.pmonth
+),
+Bucketed AS (
+    SELECT
+        CAST(pyear AS VARCHAR(4)) + '-' + RIGHT('0' + CAST(pmonth AS VARCHAR(2)), 2) AS ShamsiMonth,
+        'TapsiShop' AS customer_name,
+        CASE 
+            WHEN broadcast_per_order > 20 THEN '21+'
+            ELSE CAST(broadcast_per_order AS VARCHAR)
+        END AS Broadcast_Count_Label,
+        CASE 
+            WHEN broadcast_per_order > 20 THEN 21
+            ELSE broadcast_per_order
+        END AS Broadcast_Count_Int
+    FROM BaseData
+)
 
+SELECT 
+    ShamsiMonth,
+    customer_name,
+    Broadcast_Count_Label AS Broadcast_Count,
+    COUNT(*) AS OrderCount
+FROM Bucketed
+GROUP BY 
+    ShamsiMonth, customer_name, Broadcast_Count_Label, Broadcast_Count_Int
+ORDER BY 
+    ShamsiMonth, customer_name, Broadcast_Count_Int;
 
 
 
