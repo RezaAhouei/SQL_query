@@ -153,3 +153,36 @@ GROUP BY FLOOR(DATEDIFF(DATE(launched_at), '2024-12-14') / 7)
 
 ORDER BY MIN(DATE(launched_at));
 
+
+کوئری درخواست های منطقه ای 
+SELECT 
+    date(o.launched_at) as Date,
+    round(o.distance / 1000) as 'Order Distance - KM',
+    count() as Request,
+    count(case when accepted_at is not null then o.id end) as Accepted,
+    ROUND((count(case when accepted_at is not null then o.id end) / count()) * 100, 2) as 'Acceptance Ratio',
+    sum(case when o.status in ('delivered', 'finished') then 1 end) as Filled,
+    ROUND((sum(case when o.status in ('delivered', 'finished') then 1 end) / count(*)) * 100, 2) as 'Fill Ratio',
+    round(avg(price)) as 'AOV of Request - IRT',
+    round(avg(case when o.status in ('delivered', 'finished') then price end)) as 'AOV of Filled - IRT'
+from
+    alopeyk.orders o
+WHERE 
+    deleted_at is NULL
+    and distance > 0
+    and launched_at >= now() - interval 292 day
+    and transport_type = 'motorbike'
+    and city = 'tehran'
+    and customer_id not in (
+    select
+        user_id
+    from
+        alopeyk.customers c
+    where
+        is_api = 1)
+group by
+    1,
+    2
+order by
+    1 desc,
+    2
