@@ -186,3 +186,17 @@ group by
 order by
     1 desc,
     2
+
+
+
+
+ مجموع فیلد به تاریخ مدنظر 
+SELECT count(*) as field
+FROM orders
+WHERE 
+    deleted_at IS NULL
+    AND launched_at IS NOT NULL
+    AND cast( launched_at as date)  >= '2024-03-20' 
+    AND cast( launched_at as date) <= '2025-03-20' 
+	 AND customer_id != 15809086
+	 and status IN ('delivered', 'finished') ;
