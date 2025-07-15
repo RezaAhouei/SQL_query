@@ -216,3 +216,71 @@ WHERE
     AND CAST(launched_at AS DATE) <= '2023-03-20' 
     AND customer_id != 15809086
     AND status IN ('delivered', 'finished');
+
+
+
+
+
+تعداد درخواست های سفیر در مناطق 22 گانه تهران
+
+WITH polygon_shapes AS (
+    SELECT
+        district,
+        geometry::STPolyFromText(
+            'POLYGON((' +
+            STRING_AGG(CAST(lng AS VARCHAR(20)) + ' ' + CAST(lat AS VARCHAR(20)), ', ')
+                WITHIN GROUP (ORDER BY priority) +
+            '))', 4326
+        ) AS geom
+    FROM dbo.map_regions
+    WHERE city = 'tehran'
+    GROUP BY district
+),
+order_data AS (
+    SELECT
+        ord.id AS order_id,
+        ord.courier_id,
+        ord.customer_id,
+        CAST(ord.launched_at AS DATE) AS order_date,
+        adr_org.lat AS origin_lat,
+        adr_org.lng AS origin_lng
+    FROM dbo.Orders AS ord
+    LEFT JOIN dbo.addresses AS adr_org
+        ON adr_org.order_id = ord.id AND adr_org.[type] = 'origin'
+    WHERE
+        ord.city = 'tehran'
+        AND CAST(ord.launched_at AS DATE) = '2025-07-02'
+        AND ord.customer_id = '15886636'
+        AND ord.courier_id IS NOT NULL 
+),
+orders_with_district AS (
+    SELECT
+        od.courier_id,
+        od.customer_id,
+        od.order_date,
+        ps.district AS origin_district
+    FROM order_data od
+    LEFT JOIN polygon_shapes ps
+        ON od.origin_lat IS NOT NULL AND od.origin_lng IS NOT NULL
+        AND ps.geom.STContains(geometry::Point(od.origin_lng, od.origin_lat, 4326)) = 1
+),
+base_counts AS (
+    SELECT
+        courier_id,
+        customer_id,
+        order_date,
+        origin_district,
+        COUNT(*) AS trip_count
+    FROM orders_with_district
+    GROUP BY courier_id, customer_id, order_date, origin_district
+)
+SELECT *
+FROM base_counts
+PIVOT (
+    SUM(trip_count)
+    FOR origin_district IN (
+        [1], [2], [3], [4], [5], [6], [7], [8], [9], [10],
+        [11], [12], [13], [14], [15], [16], [17], [18], [19], [20], [21], [22]
+    )
+) AS pivot_table
+ORDER BY courier_id, customer_id;
