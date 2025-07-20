@@ -284,3 +284,21 @@ PIVOT (
     )
 ) AS pivot_table
 ORDER BY courier_id, customer_id;
+
+
+فری کمیسیون روی هر کاستومر ایدی
+SELECT 
+    courier_id,
+    SUM(price) AS total_turnover
+FROM 
+    orders
+WHERE 
+    deleted_at IS NULL
+    AND status IN ('finished', 'delivered')
+    AND customer_id = 15886636
+    AND courier_id IN ()  
+    AND accepted_at BETWEEN '2025-07-17T00:00:00' AND '2025-07-17T23:59:59'  
+GROUP BY 
+    courier_id
+ORDER BY 
+    total_turnover DESC;
