@@ -248,19 +248,17 @@ FROM (
 GROUP BY week_start_date
 ORDER BY week_start_date;
 -----------------------------------------------------------------------------------------------------------------------------
-
-میانگین مبلغ درخواست ها هر سوریس جداگانه
-SELECT AVG(price) AS `AVG(price)`
-FROM orders
-WHERE deleted_at IS NULL
-  AND status IN ('delivered', 'finished')
-  --AND customer_id in ('15809086') --zap
-  --AND customer_id in ('15886636') -- tapsi
- --AND customer_id not in ('15809086', '15886636') and transport_type = 'motor_taxi' --motor-taxi
- --AND customer_id not in ('15809086', '15886636') and transport_type in ('cargo', 'cargo_s') --alovanet
-  AND customer_id not in ('15809086', '15886636') and transport_type = 'motorbike' --alopeyk
-  AND DATE(created_at) BETWEEN '2025-03-01' AND '2025-03-07';
-------------------------------------------------------------------------------------------------------------------------------------------
+میانگین مبلغ درخواست ها 
+SELECT 
+    AVG(CAST(price AS DECIMAL(18, 2))) AS [AVG(price)]
+FROM 
+    orders
+WHERE 
+    deleted_at IS NULL
+    AND status IN ('delivered', 'finished')
+    AND customer_id NOT IN ('15809086', '15886636')  
+    AND transport_type = 'motorbike'                 
+    AND CONVERT(date, created_at) BETWEEN '2025-06-22' AND '2025-06-28';------------------------------------------------------------------------------------------------------------------------------------------
 
 برندگان کمپین ها
 
