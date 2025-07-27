@@ -339,5 +339,66 @@ ORDER BY
 
 
 
+کوئری وینر های منطقه ای 
+
+WITH map_shapes AS (
+    SELECT 
+        CAST(district AS INT) AS district_number,
+        geometry::STGeomFromText(
+            'POLYGON((' + 
+            STRING_AGG(CAST(lng AS VARCHAR(20)) + ' ' + CAST(lat AS VARCHAR(20)), ', ') 
+            + '))', 4326
+        ) AS district_shape
+    FROM dbo.map_regions
+    WHERE city = 'tehran'
+    GROUP BY district
+),
+filtered_addresses AS (
+    SELECT DISTINCT order_id, lat, lng
+    FROM alopeyk.dbo.addresses
+    WHERE type = 'origin'
+),
+orders_with_district AS (
+    SELECT 
+        o.id AS order_id,
+        o.courier_id,
+        o.customer_id,
+        o.transport_type,
+        d.district_number
+    FROM 
+        alopeyk.dbo.orders o
+    LEFT JOIN 
+        filtered_addresses a ON o.id = a.order_id
+    JOIN 
+        map_shapes d ON d.district_shape.STContains(
+            geometry::STPointFromText(
+                'POINT(' + CAST(a.lng AS VARCHAR(20)) + ' ' + CAST(a.lat AS VARCHAR(20)) + ')', 4326
+            )
+        ) = 1
+    WHERE 
+        o.deleted_at IS NULL 
+        AND o.city = 'tehran' 
+        AND o.status IN ('finished','delivered')
+        AND o.launched_at BETWEEN '2025-07-26 00:00:00' AND '2025-07-26 23:59:59'
+        AND o.delivered_at IS NOT NULL
+)
+SELECT 
+    district_number,
+    courier_id,
+    transport_type,
+    SUM(CASE WHEN customer_id = 15809086 THEN 1 ELSE 0 END) AS Zap_count,
+    SUM(CASE WHEN customer_id = 15886636 THEN 1 ELSE 0 END) AS TapsiShop_count,
+    SUM(CASE WHEN customer_id NOT IN (15809086, 15886636) THEN 1 ELSE 0 END) AS Other_count,
+    COUNT(*) AS total_orders
+FROM 
+    orders_with_district
+GROUP BY 
+    district_number, courier_id, transport_type
+ORDER BY 
+    district_number, courier_id;
+
+
+
+
 
 
