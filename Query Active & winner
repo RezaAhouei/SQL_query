@@ -401,4 +401,28 @@ ORDER BY
 
 
 
+کوئری وینر های قدیمی
+SELECT 
+    courier_id,
+    CAST(launched_at AS DATE) AS launch_date,
+    COUNT(id) AS [count of orders],
+    SUM(price) AS [turnover],
+    MIN(id) AS [one of order ids]
+FROM 
+    orders
+WHERE 
+    deleted_at IS NULL
+    AND status IN ('finished', 'delivered')
+    AND CAST(accepted_at AS DATE) = '2025-07-27'
+    AND courier_id IN (
+)
+GROUP BY 
+    courier_id,
+    CAST(launched_at AS DATE)
+ORDER BY 
+    [count of orders] DESC;
+
+
+
+
 
