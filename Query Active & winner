@@ -424,5 +424,60 @@ ORDER BY
 
 
 
+دریافت ایدی  از روی شماره موبایل
+
+SELECT
+    p.phone,
+    u.id,
+    u.firstname,
+    u.lastname,
+    ISNULL(
+        CONVERT(NVARCHAR(19),
+            (SELECT MAX(COALESCE(o.delivered_at, o.accepted_at, o.launched_at))
+             FROM orders o
+             WHERE (o.status = 'finished' OR o.status = 'delivered')
+               AND o.courier_id = u.id), 120),
+        N'ندارد'
+    ) AS last_filled_at,
+    ISNULL((
+        SELECT COUNT(*)
+        FROM orders o
+        WHERE (o.status = 'finished' OR o.status = 'delivered')
+          AND o.courier_id = u.id
+    ), 0) AS filled_count_as_courier
+FROM (
+SELECT '09966441369' AS phone
+UNION ALL SELECT '09195374783'
+) AS p
+JOIN users u
+  ON u.phone = p.phone
+ORDER BY p.phone;
+
+
+
+
+
+
+
+
+
+
+select id, firstname, courier_id
+from orders
+where city = 'tehran'
+order by id DESC
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
