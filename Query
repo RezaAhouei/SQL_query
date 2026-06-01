@@ -11,3 +11,25 @@ FROM orders
 WHERE deleted_at IS NULL
   AND created_at BETWEEN '2023-03-21' AND '2023-04-20'
     AND customer_id not in (15809086,15886636);
+
+
+
+
+COURIER_REACTIVE
+
+SELECT DISTINCT o.courier_id, o.city
+FROM orders o
+INNER JOIN users u
+    ON u.id = o.courier_id
+INNER JOIN couriers c
+    ON c.id = o.courier_id
+WHERE u.verify = 1
+  AND c.connect = 1
+  AND NOT EXISTS (
+      SELECT 1
+      FROM orders o2
+      WHERE o2.courier_id = o.courier_id
+        AND o2.accepted_at BETWEEN '2026-05-21 00:00:00'
+                              AND '2026-05-21 23:59:59'
+  );
+  
